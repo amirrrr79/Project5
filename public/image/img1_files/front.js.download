@@ -1,0 +1,545 @@
+jQuery(document).ready(function ($) {
+    $('#price_calc').on('keyup', (e) => {
+        var trimComma = e.target.value.replace(/,/g, '')
+        e.target.value = Number(trimComma).toLocaleString();
+    })
+
+    function price_converter(string) {
+        let price_array = string.split('')
+        let sanitize = []
+        price_array.forEach(elem => {
+            if (elem !== ',') {
+                sanitize.push(elem)
+            }
+        })
+        return parseInt(sanitize.join(''))
+    }
+
+    $('#plan_id').on('change', (e) => {
+        let price = $('#price_calc').val()
+        let sanitize = price_converter(price)
+        if (price === "") {
+            Swal.fire({
+                icon: 'error',
+                title: 'مبلغ خالی است',
+                showConfirmButton: true,
+                confirmButtonText: 'فهمیدم!'
+            })
+        } else if (sanitize !== 0 && Number.isInteger(sanitize)) {
+            $.post(cheque_ajax.ajax_url,
+                {
+                    'action': 'get_installments',
+                    'sec': cheque_ajax.sec_cheque_patterns,
+                    'plan_id': e.target.value,
+                    'price': sanitize,
+                    'owner': $('#cheques_id').val()
+                }, (response) => {
+                    $('.installments-info').css('display', 'block')
+                    response = JSON.parse(response)
+                    $('#count-months').html(response.months)
+                    $('#cash-value').html(response.cash)
+                    $('#installment-price').html(response.installment)
+                    $('#total-price').html(response.total)
+                })
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'مبلغ خالی است',
+                showConfirmButton: true,
+                confirmButtonText: 'فهمیدم!'
+            })
+        }
+    })
+
+    $('#calculate_price').on('click', () => {
+        let price = $('#price_calc').val()
+        let sanitize = price_converter(price)
+        $('.installments-info').css('display', 'none')
+        $('#plan_id').html('')
+        if (price === "") {
+            Swal.fire({
+                icon: 'error',
+                title: 'مبلغ خالی است',
+                showConfirmButton: true,
+                confirmButtonText: 'فهمیدم!'
+            })
+        } else if (sanitize !== 0 && Number.isInteger(sanitize)) {
+            $.post(cheque_ajax.ajax_url,
+                {
+                    'action': 'get_plans',
+                    'sec': cheque_ajax.sec_cheque_patterns
+                }, (response) => {
+                    response = JSON.parse(response)
+                    $('#plan_section').css('display', 'block')
+                    let firstOption = document.createElement('option')
+                    firstOption.innerHTML = "طرحی انتخاب نشده است"
+                    firstOption.setAttribute('disabled', 'disabled')
+                    firstOption.setAttribute('selected', 'selected')
+                    $('#plan_id').append(firstOption)
+                    response.forEach(item => {
+                        let options = document.createElement('option')
+                        options.value = item.id
+                        options.innerHTML = item.plan_name
+                        $('#plan_id').append(options)
+                    })
+                })
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'مبلغ خالی است',
+                showConfirmButton: true,
+                confirmButtonText: 'فهمیدم!'
+            })
+        }
+    })
+
+    $('#hc-state').on('change', (e) => {
+        let firstOption = document.createElement('option')
+        firstOption.setAttribute('disabled', 'disabled')
+        firstOption.setAttribute('selected', 'selected')
+        firstOption.innerHTML = 'شهر مورد نظر را انتخاب نمایید'
+        $('#hc-city').html(firstOption)
+        $.post(cheque_ajax.ajax_url,
+            {
+                'action': 'get_city',
+                'security': cheque_ajax.security,
+                'state_id': e.currentTarget.value
+            }, (data) => {
+                var response = JSON.parse(data)
+                for (var i = 0; i <= response.length - 1; i++) {
+                    let options = document.createElement('option')
+                    options.value = response[i].id
+                    options.innerHTML = response[i].city_name
+                    $('#hc-city').append(options)
+                }
+            })
+    })
+
+    $('.check-button').on('click', (e) => {
+        $('#first-step').slideUp()
+        $('#final-step').slideDown()
+        e.currentTarget.setAttribute('style', 'display:none')
+    })
+
+    const format_checker = () => {
+        Swal.fire(
+            'The Internet?',
+            'That thing is still around?',
+            'question'
+        )
+    }
+
+    if (typeof document.getElementById('owner_cheques') !== "undefined") {
+        $.fn.filepond.registerPlugin(FilePondPluginImagePreview)
+        $.fn.filepond.registerPlugin(FilePondPluginFileValidateType)
+        const inputElementOwnerCheques = document.querySelector('input[id^="owner_cheques"]')
+        const owner_cheques = FilePond.create(inputElementOwnerCheques, {
+            maxFiles: 1,
+            labelIdle: 'کارت ملی خود را کنار صورت خود گرفته و تصویر آنرا در اینجا بکشید',
+            allowRemove: false,
+            acceptedFileTypes: ['image/png', 'image/jpeg'],
+            fileValidateTypeDetectType: (source, type) =>
+                new Promise((resolve, reject) => {
+                    resolve(type);
+                }),
+        })
+        owner_cheques.setOptions({
+            server: {
+                process: (fieldName, file, metadata, load, error, progress, abort, transfer, options) => {
+                    const formData = new FormData();
+                    formData.append(fieldName, file, file.name);
+                    formData.append('action', 'cheques_uploader')
+                    formData.append('security', cheque_ajax.cheques)
+                    formData.append('type', 'owner_cheques')
+                    formData.append('owner', $('#cheques_id').val())
+                    const request = new XMLHttpRequest();
+                    request.open('POST', cheque_ajax.ajax_url);
+                    request.upload.onprogress = (e) => {
+                        progress(e.lengthComputable, e.loaded, e.total);
+                    };
+                    request.onload = function () {
+                        if (request.status >= 200 && request.status < 300) {
+                            load(request.responseText);
+                        } else {
+                            error('oh no');
+                        }
+                    };
+                    request.send(formData);
+                    return {
+                        abort: () => {
+                            request.abort();
+                            abort();
+                        },
+                    };
+                },
+            },
+        })
+    }
+
+    if (typeof document.getElementById('all_cheques') !== 'undefined') {
+        $.fn.filepond.registerPlugin(FilePondPluginImagePreview)
+        $.fn.filepond.registerPlugin(FilePondPluginFileValidateType)
+        const inputElementAllCheques = document.querySelector('input[id^="all_cheques"]');
+        const all_cheques = FilePond.create(inputElementAllCheques, {
+            maxFiles: 1,
+            labelIdle: 'چکها را زیر هم قرار داده و عکس آنرا در اینجا بارگذاری نمایید',
+            allowRemove: false,
+            acceptedFileTypes: ['image/png', 'image/jpeg'],
+            fileValidateTypeDetectType: (source, type) =>
+                new Promise((resolve, reject) => {
+                    // Do custom type detection here and return with promise
+
+                    resolve(type);
+                }),
+        })
+        all_cheques.setOptions({
+            server: {
+                process: (fieldName, file, metadata, load, error, progress, abort, transfer, options) => {
+                    const formData = new FormData();
+                    formData.append(fieldName, file, file.name);
+                    formData.append('action', 'cheques_uploader')
+                    formData.append('security', cheque_ajax.cheques)
+                    formData.append('type', 'cheques_uploader')
+                    formData.append('owner', $('#cheques_id').val())
+                    const request = new XMLHttpRequest();
+                    request.open('POST', cheque_ajax.ajax_url);
+                    request.upload.onprogress = (e) => {
+                        progress(e.lengthComputable, e.loaded, e.total);
+                    };
+                    request.onload = function () {
+                        if (request.status >= 200 && request.status < 300) {
+                            load(request.responseText);
+                        } else {
+                            error('oh no');
+                        }
+                    };
+                    request.send(formData);
+                    return {
+                        abort: () => {
+                            request.abort();
+                            abort();
+                        },
+                    };
+                },
+            },
+        })
+
+    }
+
+
+    $('#all-cheques-image').on('click', () => {
+        document.getElementById('cheques').click()
+    })
+
+    $('#personal-image').on('click', () => {
+        document.getElementById('owner_cheques').click()
+    })
+
+    function get_gateways(cash) {
+        $.post(cheque_ajax.ajax_url,
+            {
+                'action': 'get_gateways',
+                'security': cheque_ajax.sec_cheque_patterns,
+                'owner': $('#cheques_id').val(),
+            }, (response) => {
+                response = JSON.parse(response)
+                if (parseInt(cash) === 0) {
+                    $('#price_section').css('display', 'none')
+                    $('#payment_button_display').css('display', 'block')
+                    $('#payment_button').html('ثبت سفارش').val(response.payment_validate)
+                    $('#gateway_type').val('just_order')
+                } else {
+                    $('#gateways').html(response.gateways).attr('style', 'display:block')
+                }
+            })
+    }
+
+    $('#near_checkbox').on('change', (e) => {
+        if (e.target.checked === true) {
+            $('#near-fields').attr('style', 'display:block')
+        }
+        if (e.target.checked === false) {
+            $('#near-fields').attr('style', 'display:none')
+        }
+    })
+
+    function escapeRegex(string) {
+        return string.replace(/\\/g, '');
+    }
+
+    $('#cheque-pattern').on('click', (e) => {
+        if (typeof document.querySelector(`[name="cheque_id_master"]`) !== 'undefined') {
+            $('#plan_description').html('')
+            $('#gateways').attr('style', 'display:none').html('')
+            document.getElementById('cheques_info').style.display = 'none'
+            document.getElementById('pattern-detail-form').style.display = 'none'
+            $('#cheque-dates').html("")
+            $('#installment-show').html("")
+            $('#payment_button').html("پرداخت")
+        }
+        $.post(cheque_ajax.ajax_url,
+            {
+                'action': 'get_cheque_patterns',
+                'security': cheque_ajax.sec_cheque_patterns,
+                'pattern_id': e.currentTarget.value,
+                'owner': $('#cheques_id').val()
+            }, (response) => {
+                response = JSON.parse(response)
+                console.log(response)
+                if (response.error === -1) {
+                    Swal.fire({
+                        icon: 'error',
+                        text: 'برای بازه قیمتی مورد نظر شما طرحی یافت نشد',
+                    })
+                } else {
+                    document.getElementById('pattern-detail-form').style.display = 'block'
+                    document.getElementById('cheques_info').style.display = 'block'
+                    let dates = response.dates
+                    $('#installment-show').html(response.installment)
+                    if (response.description !== null) {
+                        $('#plan_description_section').attr('style', 'display:block')
+                        $('#plan_description').html(escapeRegex(response.description))
+                    }
+                    document.getElementById('pattern-detail-form').style.display = 'block';
+                    for (var i = 0; i <= dates.length - 1; i++) {
+                        let mainDiv = document.createElement('div'),
+                            separateDiv = document.createElement('div'),
+                            dateSpan = document.createElement('span'),
+                            chequeIDSpan = document.createElement('span'),
+                            chequeIDInput = document.createElement('input'),
+                            chequeSerialSpan = document.createElement('span'),
+                            chequeSerialInput = document.createElement('input'),
+                            ownerChequeDiv = document.createElement('div'),
+                            ownerChequeLabel = document.createElement('label'),
+                            ownerChequeInput = document.createElement('input'),
+                            modal = document.createElement('div'),
+                            modalContent = document.createElement('div'),
+                            spanClose = document.createElement('span'),
+                            buttonClose = document.createElement('button'),
+                            contentDiv = document.createElement('div'),
+                            fieldset = document.createElement('fieldset'),
+                            legend = document.createElement('legend'),
+                            twinNamesDiv = document.createElement('div'),
+                            inputGroupName = document.createElement('div'),
+                            labelInputName = document.createElement('label'),
+                            inputName = document.createElement('input'),
+                            inputGroupLname = document.createElement('div'),
+                            labelInputLname = document.createElement('label'),
+                            inputLname = document.createElement('input'),
+                            twinNumbersDiv = document.createElement('div'),
+                            inputGroupPhone = document.createElement('div'),
+                            labelInputPhone = document.createElement('label'),
+                            inputPhone = document.createElement('input'),
+                            inputGroupID = document.createElement('div'),
+                            labelInputID = document.createElement('label'),
+                            inputID = document.createElement('input'),
+                            twinAddressDiv = document.createElement('div'),
+                            inputGroupAddress = document.createElement('div'),
+                            labelInputAddress = document.createElement('label'),
+                            inputAddress = document.createElement('textarea');
+                        dateSpan.classList.add('cheque_date')
+                        dateSpan.classList.add('cheque-items')
+                        dateSpan.innerHTML = (parseInt(i) + 1) + ' . ' + dates[i].cheque_date + '  '
+                        chequeIDInput.name = 'cheque_id_master' + i
+                        chequeIDInput.classList.add('cheque_id')
+                        chequeIDInput.placeholder = "کد ۱۶ رقمی چک را وارد نمایید."
+                        chequeIDSpan.append(chequeIDInput)
+                        chequeIDSpan.classList.add('cheque-items')
+                        chequeSerialInput.name = 'cheque_serial_number' + i
+                        chequeSerialInput.placeholder = 'شماره سریال ۶ رقمی چک را وارد نمایید.'
+                        chequeSerialInput.classList.add('cheque_serial')
+                        chequeSerialSpan.append(chequeSerialInput)
+                        chequeSerialSpan.classList.add('cheque-items')
+                        separateDiv.classList.add('separate-cheque-div')
+                        ownerChequeDiv.classList.add('owner-cheque')
+                        ownerChequeLabel.classList.add('owner-cheque-label')
+                        ownerChequeInput.classList.add('owner-cheque-input')
+                        ownerChequeInput.type = "checkbox"
+                        ownerChequeInput.id = parseInt(i) + 1 + '_input'
+                        ownerChequeInput.setAttribute('data-id', (parseInt(i) + 1))
+                        ownerChequeLabel.innerHTML = "ثبت اطلاعات صاحب چک(در صورتی که چک متعلق به فرد دیگری است)"
+                        ownerChequeLabel.htmlFor = parseInt(i) + 1 + '_input'
+                        modal.classList.add('modal')
+                        modal.id = (parseInt(i) + 1) + '_owner_modal'
+                        modalContent.classList.add('modal-content')
+                        spanClose.classList.add('modal-close')
+                        spanClose.setAttribute('data-id', (parseInt(i) + 1))
+                        buttonClose.classList.add('button-close-modal')
+                        buttonClose.setAttribute('data-id', (parseInt(i) + 1))
+                        buttonClose.innerHTML = 'ثبت اطلاعات'
+                        buttonClose.type = 'button'
+                        spanClose.innerHTML = '&times;'
+                        fieldset.classList.add('hc-near-field')
+                        legend.classList.add('near-title')
+                        legend.innerHTML = 'اطلاعات صاحب چک را وارد نمایید'
+                        twinNamesDiv.classList.add('hc-near')
+                        inputGroupName.classList.add('input-group')
+                        labelInputName.classList.add('hc-near-label')
+                        labelInputName.innerHTML = 'نام'
+                        inputName.classList.add('hc-near-input')
+                        inputName.name = 'owner_cheque_firstname' + i
+                        inputGroupName.append(labelInputName, inputName)
+                        inputGroupLname.classList.add('input-group')
+                        labelInputLname.classList.add('hc-near-label')
+                        labelInputLname.innerHTML = 'نام خانوادگی'
+                        inputLname.classList.add('hc-near-input')
+                        inputLname.name = 'owner_cheque_lastname' + i
+                        inputGroupLname.append(labelInputLname, inputLname)
+                        twinNamesDiv.append(inputGroupName, inputGroupLname)
+                        inputGroupPhone.classList.add('input-group')
+                        labelInputPhone.classList.add('hc-near-label')
+                        labelInputPhone.innerHTML = 'شماره تماس'
+                        inputPhone.classList.add('hc-near-input')
+                        inputPhone.name = 'owner_cheque_phone' + i
+                        inputGroupPhone.append(labelInputPhone, inputPhone)
+                        twinNumbersDiv.classList.add('hc-near')
+                        inputGroupID.classList.add('input-group')
+                        labelInputID.classList.add('hc-near-label')
+                        labelInputID.innerHTML = 'کد ملی'
+                        inputID.classList.add('hc-near-input')
+                        inputID.name = 'owner_cheque_id' + i
+                        inputGroupID.append(labelInputID, inputID)
+                        twinNumbersDiv.append(inputGroupPhone, inputGroupID)
+                        inputGroupAddress.classList.add('input-group')
+                        labelInputAddress.classList.add('hc-near-label')
+                        labelInputAddress.innerHTML = 'آدرس محل سکونت'
+                        inputAddress.classList.add('hc-near-input')
+                        inputAddress.name = 'owner_cheque_address' + i
+                        inputGroupAddress.append(labelInputAddress, inputAddress)
+                        twinAddressDiv.append(inputGroupAddress)
+                        contentDiv.classList.add('content-owner')
+                        fieldset.append(legend, twinNamesDiv, twinNumbersDiv, twinAddressDiv)
+                        contentDiv.append(fieldset, buttonClose)
+                        modalContent.append(spanClose, contentDiv)
+                        modal.append(modalContent)
+                        ownerChequeDiv.append(ownerChequeLabel, ownerChequeInput)
+                        separateDiv.append(dateSpan, chequeIDSpan, chequeSerialSpan, ownerChequeDiv, modal)
+                        mainDiv.append(separateDiv)
+                        mainDiv.classList.add('main-div-list')
+                        document.getElementById('cheque-dates').append(mainDiv)
+                    }
+                    if (response.cash !== 0) {
+                        document.getElementById('price_section').style.display = 'block'
+                    }
+                    $('#final_price').html(response.cash)
+                    get_gateways(response.cash)
+                }
+            })
+    })
+
+    $(document).on('click', 'span.modal-close', (e) => {
+        $('#' + e.target.getAttribute('data-id') + '_owner_modal').attr('style', 'display:none')
+    })
+    $(document).on('click', 'button.button-close-modal', (e) => {
+        $('#' + e.target.getAttribute('data-id') + '_owner_modal').attr('style', 'display:none')
+    })
+
+    $(document).on('change', 'input.owner-cheque-input', (e) => {
+        if (e.target.checked === true) {
+            $('#' + e.target.getAttribute('data-id') + '_owner_modal').attr('style', 'display:block')
+        }
+        if (e.target.checked === false) {
+            $('#' + e.target.getAttribute('data-id') + '_owner_modal :input').val('')
+        }
+    })
+
+    $(document).on('click', 'label.payment_method', () => {
+        document.getElementById('payment_button_display').style.display = 'none'
+        jQuery.post(cheque_ajax.ajax_url,
+            {
+                'action': 'payment_validate',
+                'security': cheque_ajax.sec_cheque_patterns,
+            }, (response) => {
+                document.getElementById('payment_button_display').style.display = 'block'
+                $('#payment_button').val(response)
+                $('#gateway_type').val('gateway')
+            })
+    })
+
+
+    if (document.getElementById('different_price') !== null) {
+        document.getElementById('different_price').addEventListener('keyup', (e) => {
+            var value = e.target.value
+            var trimComma = value.replace(/,/g, '')
+            e.target.value = Number(trimComma).toLocaleString();
+        })
+
+        document.getElementById('new_price_evaluate').addEventListener('click', () => {
+            $.post(cheque_ajax.ajax_url,
+                {
+                    'action': 'calculate_new_price',
+                    'security': cheque_ajax.sec_cheque_patterns,
+                    'new_price': document.getElementById('different_price').value,
+                    'owner': document.getElementById('cheques_id').value,
+                    'pattern_id': document.getElementById('cheque-pattern').value,
+                }, (response) => {
+                    if (response.search(',') == -1) {
+                        Swal.fire({
+                            icon: 'error',
+                            text: response,
+                        })
+                    } else {
+                        response = JSON.parse(response)
+                        document.getElementById('installment-show').innerHTML = response.installment
+                        document.getElementById('final_price').innerHTML = response.final_cash_price
+                    }
+                })
+        })
+    }
+
+    if (typeof document.getElementsByClassName('payment_method') !== 'undefined') {
+        $('.payment_method').on('click', () => {
+            document.getElementById('payment_button_display').style.display = 'none'
+            $.post(cheque_ajax.ajax_url,
+                {
+                    'action': 'payment_validate',
+                    'security': cheque_ajax.sec_cheque_patterns,
+                }, (response) => {
+                    document.getElementById('payment_button_display').style.display = 'block'
+                    document.getElementById('payment_button').value = response
+                })
+        })
+    }
+
+
+    if (typeof error_handler !== 'undefined') {
+        if (typeof error_handler.fname !== 'undefined') {
+            $('#hc-fname-error').attr('display', 'block !important').html(error_handler.fname)
+        }
+        if (typeof error_handler.lname !== 'undefined') {
+            $('#hc-lname-error').attr('display', 'block !important').html(error_handler.lname)
+        }
+        if (typeof error_handler.mobile !== 'undefined') {
+            $('#hc-mobile-error').attr('display', 'block !important').html(error_handler.mobile)
+        }
+        if (typeof error_handler.national_code !== 'undefined') {
+            $('#hc-national-code-error').attr('display', 'block !important').html(error_handler.national_code)
+        }
+        if (typeof error_handler.state !== 'undefined') {
+            $('#hc-state-error').attr('display', 'block !important').html(error_handler.state)
+        }
+        if (typeof error_handler.city !== 'undefined') {
+            $('#hc-city-error').attr('display', 'block !important').html(error_handler.city)
+        }
+        if (typeof error_handler.address !== 'undefined') {
+            $('#hc-address-error').attr('display', 'block !important').html(error_handler.address)
+        }
+        if (typeof error_handler.postal_code !== 'undefined') {
+            $('#hc-postal-code-error').attr('display', 'block !important').html(error_handler.postal_code)
+        }
+        if (typeof error_handler.near_fname !== 'undefined') {
+            $('#hc-near-fname-error').attr('display', 'block !important').html(error_handler.near_fname)
+        }
+        if (typeof error_handler.near_lname !== 'undefined') {
+            $('#hc-near-lname-error').attr('display', 'block !important').html(error_handler.near_lname)
+        }
+        if (typeof error_handler.near_national_code !== 'undefined') {
+            $('#hc-near-national-code-error').attr('display', 'block !important').html(error_handler.near_national_code)
+        }
+        if (typeof error_handler.near_mobile !== 'undefined') {
+            $('#hc-near-mobile-error').attr('display', 'block !important').html(error_handler.near_mobile)
+        }
+    }
+
+
+})

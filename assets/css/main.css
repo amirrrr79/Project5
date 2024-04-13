@@ -1,0 +1,25 @@
+@import "bootstrap/dist/css/bootstrap.min.css";
+@import 'bootstrap-icons/font/bootstrap-icons.css';
+
+@font-face {
+    font-family: "Vazir";
+    src: url(../fonts/Vazir.eot);
+    src: url(../fonts/Vazir.eot) format("embedded-opentype"),
+        url(../fonts/Vazir.woff2) format("woff2"),
+        url(../fonts/Vazir.woff) format("woff"),
+        url(../fonts/Vazir.ttf) format("truetype");
+}
+
+
+body {
+    font-family: 'Vazir' !important;
+    font-size: 0.875rem;
+    direction: rtl;
+    background:#f8f8f8;
+}
+ul {
+    list-style-type: none;
+}
+a {
+    text-decoration: none;
+}

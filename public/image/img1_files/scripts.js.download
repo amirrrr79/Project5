@@ -1,0 +1,79 @@
+jQuery(document).ready(function ($) {
+
+    /**
+     * Ajax search product request
+     * @type {*|jQuery|HTMLElement}
+     */
+    var _nonce = $('meta[name="_wast_nonce"]').attr('content');
+    var ajaxResult = $('.wast-product-title-wrapper .wast-ajax-result');
+    var searchInput = $('.wast-product-title-wrapper input[type=text]');
+    var loader = $('.wast-product-title-wrapper .wast-loader');
+    var $continue = true;
+    searchInput.on('input', function () {
+        var $this = $(this);
+        var searchTerm = $this.val();
+        if (searchTerm.length < 2) {
+            $continue = false;
+            ajaxResult.fadeOut();
+            loader.fadeOut();
+            return false;
+        } else {
+            $continue = true;
+        }
+
+        loader.fadeIn();
+
+        $.ajax({
+            url: wast_data.ajax_url,
+            type: 'post',
+            dataType: 'json',
+            timeout: 20000,
+            data: {
+                action: 'wast_search',
+                searchTerm: searchTerm,
+                _wast_nonce: _nonce
+            },
+            success: function (response) {
+                if (response._result !== '' && $continue) {
+                    ajaxResult.html(response._result).fadeIn();
+                } else {
+                    ajaxResult.empty().hide();
+                }
+                loader.fadeOut();
+            },
+            error: function () {
+                ajaxResult.fadeOut();
+                loader.fadeOut();
+            }
+        });
+    });
+
+    /**
+     * Show product title in input
+     */
+    $(document).on('click', '.wast-ajax-result li', function (e) {
+        e.stopPropagation();
+        var $this = $(this);
+        var productID = parseInt($this.data('id'));
+        var productTitle = $this.text();
+
+        $('#product-id').val(productID);
+        searchInput.val(productTitle);
+        ajaxResult.fadeOut();
+    });
+    $('body').click(function () {
+        setTimeout(function () {
+            ajaxResult.empty().hide();
+            loader.fadeOut();
+        }, 500);
+    });
+
+    /**
+     * Show file name when file select form input[type="file"]
+     */
+    $('#ticket-file').change(function () {
+        var $this = $(this);
+        var file = $this[0].files[0];
+        $this.next('label').text(file['name']);
+    });
+});
