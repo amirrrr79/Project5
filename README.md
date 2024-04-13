@@ -1,3 +1,11 @@
+
+https://master--poetic-genie-7ae5d6.netlify.app/    مشاهده آنلاین پروژه
+
+
+
+
+
+
 # Nuxt 3 Minimal Starter
 
 Look at the [Nuxt 3 documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
